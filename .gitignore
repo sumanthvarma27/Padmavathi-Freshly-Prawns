@@ -41,5 +41,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# nested projects
-/tablet-app
+# tablet app local artifacts
+/tablet-app/.env
+/tablet-app/.expo
+/tablet-app/.idea
+/tablet-app/.DS_Store

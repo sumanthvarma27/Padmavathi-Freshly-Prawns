@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Padmavathi Tablet",
+    "slug": "padmavathi-tablet",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "padmavathitablet",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.padmavathi.tablet"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Padmavathi Tablet to scan QR codes for batch selection."
+        }
+      ]
+    ]
+  }
+}

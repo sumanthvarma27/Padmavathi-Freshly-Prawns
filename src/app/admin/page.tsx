@@ -8,7 +8,8 @@ import {
   Users2,
   Banknote,
   LineChart,
-  Briefcase
+  Briefcase,
+  AlertTriangle,
 } from 'lucide-react'
 
 const CARDS = [
@@ -49,10 +50,10 @@ const CARDS = [
     description: 'Effective-dated rates per processing type and count range.',
   },
   {
-    title: 'Company Rates (Phase 2)',
+    title: 'Company Rates',
     href: '/admin/rates/company',
     icon: Briefcase,
-    description: 'Company-specific effective-dated rates.',
+    description: 'Company-specific effective-dated rates for profitability.',
   },
   {
     title: 'Daily Summary',
@@ -67,6 +68,12 @@ const CARDS = [
     description: 'Filter and export stock inward entries.',
   },
   {
+    title: 'Stock Lots',
+    href: '/admin/ops/stock-lots',
+    icon: Factory,
+    description: 'Open/close/reopen stock lots with balance tracking.',
+  },
+  {
     title: 'Processing Ops',
     href: '/admin/ops/processing-entries',
     icon: ListTodo,
@@ -77,6 +84,42 @@ const CARDS = [
     href: '/admin/reports/payroll',
     icon: Banknote,
     description: 'Batch-level payroll totals from snapshots.',
+  },
+  {
+    title: 'Payroll by Member',
+    href: '/admin/reports/payroll-members',
+    icon: Banknote,
+    description: 'Member-level payroll from processing entry splits.',
+  },
+  {
+    title: 'Reconciliation',
+    href: '/admin/reports/reconciliation',
+    icon: LineChart,
+    description: 'Raw vs processed vs variance overview.',
+  },
+  {
+    title: 'Profitability',
+    href: '/admin/reports/profitability',
+    icon: LineChart,
+    description: 'Per stock inward profitability with day totals.',
+  },
+  {
+    title: 'Unbalanced Alerts',
+    href: '/admin/reports/unbalanced',
+    icon: AlertTriangle,
+    description: 'Detect invalid lot balance states quickly.',
+  },
+  {
+    title: 'Corrections & Audit',
+    href: '/admin/ops/corrections',
+    icon: ListTodo,
+    description: 'Void/edit entries with reason and audit trail.',
+  },
+  {
+    title: 'Change History',
+    href: '/admin/reports/change-history',
+    icon: Briefcase,
+    description: 'Master-data change tracking by table and time.',
   },
   {
     title: 'Exports',

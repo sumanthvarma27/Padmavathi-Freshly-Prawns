@@ -4,8 +4,19 @@ import { PickerField } from '../components/PickerField'
 import { QRScannerModal } from '../components/QRScannerModal'
 import type { MasterData } from '../types/db'
 import { getWorkerRate } from '../lib/rates'
-import { saveMemberWeightsBestEffort, submitProcessingEntry } from '../lib/transactions'
+import { submitProcessingEntryAtomic } from '../lib/transactions'
+import { enqueue } from '../lib/offline-queue'
 import type { StockInwardContext } from '../types/workflow'
+
+function isLikelyNetworkError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
+  return (
+    message.includes('network') ||
+    message.includes('fetch') ||
+    message.includes('failed to fetch') ||
+    message.includes('offline')
+  )
+}
 
 export function ProcessingEntryScreen({
   masterData,
@@ -14,7 +25,7 @@ export function ProcessingEntryScreen({
 }: {
   masterData: MasterData
   selectedStock: StockInwardContext | null
-  onProcessingSaved: (processedWeightKg: number) => void
+  onProcessingSaved: () => void
 }) {
   const [batchId, setBatchId] = useState('')
   const [processingTypeId, setProcessingTypeId] = useState('')
@@ -23,6 +34,11 @@ export function ProcessingEntryScreen({
   const [ratePerKg, setRatePerKg] = useState<number | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [status, setStatus] = useState<{
+    type: 'success' | 'error' | 'info'
+    title: string
+    message: string
+  } | null>(null)
 
   const batchCode = useMemo(() => {
     const selected = masterData.batches.find((batch) => batch.id === batchId)
@@ -66,6 +82,7 @@ export function ProcessingEntryScreen({
 
   const onLookupRate = async () => {
     if (!processingTypeId || !countRangeId) {
+      setStatus({ type: 'error', title: 'Missing fields', message: 'Select processing type and count range first.' })
       Alert.alert('Missing fields', 'Select processing type and count range first.')
       return
     }
@@ -85,15 +102,19 @@ export function ProcessingEntryScreen({
         effectiveAt: `${selectedStock.entryDate}T00:00:00`,
       })
       setRatePerKg(rate)
+      setStatus({ type: 'success', title: 'Rate loaded', message: `Rate: ${rate.toFixed(2)} / kg` })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Rate lookup failed.'
+      setStatus({ type: 'error', title: 'Rate not found', message })
       Alert.alert('Rate not found', message)
     }
   }
 
   const onSave = async () => {
+    setStatus(null)
     const weight = totalWeightKg
     if (!selectedStock) {
+      setStatus({ type: 'error', title: 'Select stock inward', message: 'Create or select a stock inward first.' })
       Alert.alert('Select stock inward', 'Create or select a stock inward first.')
       return
     }
@@ -102,14 +123,17 @@ export function ProcessingEntryScreen({
       return
     }
     if (!batchId || !processingTypeId || !countRangeId) {
+      setStatus({ type: 'error', title: 'Missing fields', message: 'Fill all required fields.' })
       Alert.alert('Missing fields', 'Fill all required fields.')
       return
     }
     if (Number.isNaN(weight) || weight <= 0) {
+      setStatus({ type: 'error', title: 'Invalid weight', message: 'Processed weight must be greater than 0.' })
       Alert.alert('Invalid weight', 'Processed weight must be greater than 0.')
       return
     }
     if (ratePerKg == null) {
+      setStatus({ type: 'error', title: 'Rate missing', message: 'Lookup worker rate before saving.' })
       Alert.alert('Rate missing', 'Lookup worker rate before saving.')
       return
     }
@@ -126,6 +150,7 @@ export function ProcessingEntryScreen({
       .filter((entry) => !Number.isNaN(entry.weightKg) && entry.weightKg > 0)
 
     if (selectedMemberWeights.length === 0) {
+      setStatus({ type: 'error', title: 'No member weights', message: 'Enter at least one member weight.' })
       Alert.alert('No member weights', 'Enter at least one member weight.')
       return
     }
@@ -137,27 +162,52 @@ export function ProcessingEntryScreen({
 
     setSaving(true)
     try {
-      const result = await submitProcessingEntry({
-        entryDate: selectedStock.entryDate,
-        shedId: selectedStock.shedId,
-        companyId: selectedStock.companyId,
+      const result = await submitProcessingEntryAtomic({
+        lotId: selectedStock.id,
         batchId,
         processingTypeId,
         countRangeId,
-        processedWeightKg: weight,
         ratePerKgSnapshot: ratePerKg,
-      })
-
-      await saveMemberWeightsBestEffort({
-        processingEntryId: result.processingEntryId,
         memberWeights: selectedMemberWeights,
       })
 
-      onProcessingSaved(weight)
+      onProcessingSaved()
       setMemberWeights({})
-      Alert.alert('Saved', `Processing entry saved. Amount: ${result.amountSnapshot.toFixed(2)}`)
+      setStatus({
+        type: 'success',
+        title: 'Saved',
+        message: `Processing entry saved. Amount: ${result.amountSnapshot.toFixed(2)} | Remaining lot: ${result.lotRemainingKg.toFixed(2)} kg`,
+      })
+      Alert.alert(
+        'Saved',
+        `Processing entry saved. Amount: ${result.amountSnapshot.toFixed(2)} | Remaining lot: ${result.lotRemainingKg.toFixed(2)} kg`
+      )
     } catch (error) {
+      if (isLikelyNetworkError(error)) {
+        await enqueue({
+          type: 'processing_round',
+          payload: {
+            lotId: selectedStock.id,
+            batchId,
+            processingTypeId,
+            countRangeId,
+            ratePerKgSnapshot: ratePerKg,
+            memberWeights: selectedMemberWeights,
+          },
+        })
+        onProcessingSaved()
+        setMemberWeights({})
+        setStatus({
+          type: 'info',
+          title: 'Queued offline',
+          message: 'No internet. Processing round queued and will sync later.',
+        })
+        Alert.alert('Queued offline', 'No internet. Processing round queued and will sync later.')
+        return
+      }
+
       const message = error instanceof Error ? error.message : 'Failed to save processing entry.'
+      setStatus({ type: 'error', title: 'Save failed', message })
       Alert.alert('Save failed', message)
     } finally {
       setSaving(false)
@@ -167,6 +217,19 @@ export function ProcessingEntryScreen({
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Processing Entry</Text>
+      {status && (
+        <View
+          style={[
+            styles.statusBox,
+            status.type === 'success' && styles.statusSuccess,
+            status.type === 'error' && styles.statusError,
+            status.type === 'info' && styles.statusInfo,
+          ]}
+        >
+          <Text style={styles.statusTitle}>{status.title}</Text>
+          <Text style={styles.statusMessage}>{status.message}</Text>
+        </View>
+      )}
 
       {!selectedStock ? (
         <Text style={styles.warning}>Select a stock inward first from the stock list above.</Text>
@@ -259,6 +322,18 @@ export function ProcessingEntryScreen({
 const styles = StyleSheet.create({
   container: { gap: 12 },
   title: { fontSize: 20, fontWeight: '700', color: '#0f172a' },
+  statusBox: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 2,
+  },
+  statusSuccess: { backgroundColor: '#ecfdf5', borderColor: '#10b981' },
+  statusError: { backgroundColor: '#fef2f2', borderColor: '#ef4444' },
+  statusInfo: { backgroundColor: '#eff6ff', borderColor: '#3b82f6' },
+  statusTitle: { fontSize: 14, fontWeight: '700', color: '#0f172a' },
+  statusMessage: { fontSize: 13, color: '#334155', marginTop: 2 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   field: { gap: 6 },
   label: { fontSize: 14, fontWeight: '600', color: '#0f172a' },

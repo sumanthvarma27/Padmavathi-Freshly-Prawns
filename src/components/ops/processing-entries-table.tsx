@@ -24,6 +24,7 @@ import {
 type Lookup = { id: string; name: string }
 
 type ProcessingEntry = {
+  entry_id?: string
   processing_entry_id?: string
   entry_date?: string
   processed_weight_kg?: number
@@ -205,7 +206,7 @@ export default function ProcessingEntriesTable({
               </TableRow>
             ) : (
               filteredRows.map((row, i) => (
-                <TableRow key={row.processing_entry_id || i}>
+                <TableRow key={row.entry_id || row.processing_entry_id || i}>
                   <TableCell>{formatDate(resolveDate(row))}</TableCell>
                   <TableCell>{row.companies?.name || '-'}</TableCell>
                   <TableCell>{row.sheds?.name || '-'}</TableCell>

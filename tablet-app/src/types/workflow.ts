@@ -1,5 +1,6 @@
 export type StockInwardContext = {
   id: string
+  stockInwardId?: string
   entryDate: string
   shedId: string
   shedLabel: string

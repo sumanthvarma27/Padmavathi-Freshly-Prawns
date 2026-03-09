@@ -111,6 +111,8 @@ padmavathi-admin/
 - [ER Diagram](/Users/sumanthvarma/Desktop/padmavathi-admin/docs/ER_DIAGRAM.md)
 - [API / RPC Contracts](/Users/sumanthvarma/Desktop/padmavathi-admin/docs/API_RPC_CONTRACTS.md)
 - [Sprint Checklist](/Users/sumanthvarma/Desktop/padmavathi-admin/docs/SPRINT_CHECKLIST.md)
+- [Pilot Readiness Checklist](/Users/sumanthvarma/Desktop/padmavathi-admin/docs/PILOT_READINESS_CHECKLIST.md)
+- [Maintenance Strategy](/Users/sumanthvarma/Desktop/padmavathi-admin/docs/MAINTENANCE_STRATEGY.md)
 
 ---
 
@@ -226,3 +228,12 @@ Notes:
 ### Reporting
 - [ ] Daily summary numbers align with transactions
 - [ ] CSV exports open correctly in spreadsheet tools
+
+---
+
+## 13. Start Test Run (Broad Sequence)
+1. Complete [Pilot Readiness Checklist](/Users/sumanthvarma/Desktop/padmavathi-admin/docs/PILOT_READINESS_CHECKLIST.md) sections 1-5.
+2. Freeze pilot master data (rates/batches/members) for test window.
+3. Run one controlled shed dry-run and capture issues using incident template.
+4. Review reconciliation (raw vs processed vs payroll) with accountant.
+5. Decide Go/No-Go using sign-off block in pilot checklist.

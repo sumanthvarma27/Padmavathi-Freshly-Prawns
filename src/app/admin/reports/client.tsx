@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
+import PrintButton from '@/components/reports/print-button'
 
 type DailySummary = {
   summary_date: string
@@ -34,6 +35,9 @@ type DailySummary = {
   yield_percent: number
 }
 
+type CompanyOption = { company_id: string; name: string }
+type ShedOption = { shed_id: string; name: string }
+
 export default function ReportsClient({
   data,
   sheds,
@@ -41,8 +45,8 @@ export default function ReportsClient({
   hasError
 }: {
   data: DailySummary[]
-  sheds: any[]
-  companies: any[]
+  sheds: ShedOption[]
+  companies: CompanyOption[]
   hasError: boolean
 }) {
   const [filterCompany, setFilterCompany] = useState<string>('all')
@@ -135,10 +139,13 @@ export default function ReportsClient({
         <p className="text-sm text-muted-foreground">
           Showing {filteredData.length} records
         </p>
-        <Button onClick={handleExportCSV} disabled={filteredData.length === 0} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
-          <Download className="h-4 w-4" />
-          Export CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={handleExportCSV} disabled={filteredData.length === 0} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+          <PrintButton />
+        </div>
       </div>
 
       <div className="rounded-md border bg-white overflow-x-auto">
@@ -161,7 +168,7 @@ export default function ReportsClient({
                   <div className="flex flex-col items-center justify-center gap-2">
                     <AlertCircle className="h-6 w-6" />
                     <p className="font-semibold">Database View Missing</p>
-                    <p className="text-sm">Cannot load daily summary report. The view `v_daily_summary` might not have been created yet or isn't accessible to the API.</p>
+                    <p className="text-sm">Cannot load daily summary report. The view `v_daily_summary` might not have been created yet or isn&apos;t accessible to the API.</p>
                   </div>
                 </TableCell>
               </TableRow>

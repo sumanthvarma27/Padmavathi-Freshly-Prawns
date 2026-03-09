@@ -52,6 +52,13 @@ function getErrorMessage(error: unknown): string {
   return 'Unexpected error'
 }
 
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  return date.toISOString().replace('T', ' ').slice(0, 19)
+}
+
 export default function WorkerRatesClient({
   initialRates,
   processingTypes,
@@ -67,6 +74,7 @@ export default function WorkerRatesClient({
   const [filterActiveOnly, setFilterActiveOnly] = useState(true)
   const [selectedProcessingTypeId, setSelectedProcessingTypeId] = useState('')
   const [selectedCountRangeId, setSelectedCountRangeId] = useState('')
+  const [effectiveFromValue, setEffectiveFromValue] = useState('')
 
   // Filtering
   const [filterType, setFilterType] = useState('all')
@@ -75,6 +83,7 @@ export default function WorkerRatesClient({
   const handleOpenAdd = () => {
     setSelectedProcessingTypeId('')
     setSelectedCountRangeId('')
+    setEffectiveFromValue(localIsoString)
     setIsModalOpen(true)
   }
 
@@ -130,6 +139,18 @@ export default function WorkerRatesClient({
   const localIsoString = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000)
     .toISOString()
     .slice(0, 16)
+
+  const conflictingRates = rates.filter((rate) => {
+    if (!selectedProcessingTypeId || !selectedCountRangeId || !effectiveFromValue) return false
+    if (rate.processing_type_id !== selectedProcessingTypeId) return false
+    if (rate.count_range_id !== selectedCountRangeId) return false
+    if (!rate.is_active) return false
+
+    const start = new Date(rate.effective_from).getTime()
+    const end = rate.effective_to ? new Date(rate.effective_to).getTime() : Number.POSITIVE_INFINITY
+    const newStart = new Date(effectiveFromValue).getTime()
+    return Number.isFinite(newStart) && newStart >= start && newStart < end
+  })
 
   return (
     <div className="space-y-4">
@@ -219,10 +240,10 @@ export default function WorkerRatesClient({
                     {rate.rate_per_kg.toFixed(2)}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {new Date(rate.effective_from).toLocaleString()}
+                    {formatDateTime(rate.effective_from)}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {rate.effective_to ? new Date(rate.effective_to).toLocaleString() : '—'}
+                    {formatDateTime(rate.effective_to)}
                   </TableCell>
                   <TableCell>
                     {rate.is_active ? (
@@ -314,7 +335,8 @@ export default function WorkerRatesClient({
                     id="effective_from"
                     name="effective_from"
                     type="datetime-local"
-                    defaultValue={localIsoString}
+                    value={effectiveFromValue}
+                    onChange={(e) => setEffectiveFromValue(e.target.value)}
                     required
                   />
                 </div>
@@ -330,6 +352,19 @@ export default function WorkerRatesClient({
                   </p>
                 </div>
               </div>
+              {conflictingRates.length > 0 ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  <p className="font-semibold">Conflict Warning</p>
+                  <p className="mt-1">
+                    {conflictingRates.length} active rate window(s) overlap this `effective_from`. Existing windows will be closed on save.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                  <p className="font-semibold">No Active Overlap</p>
+                  <p className="mt-1">Selected combination currently has no overlapping active rate for this start date.</p>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button

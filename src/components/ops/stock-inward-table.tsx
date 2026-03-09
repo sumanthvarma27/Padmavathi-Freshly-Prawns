@@ -24,6 +24,7 @@ import {
 type Lookup = { id: string; name: string }
 
 type StockInwardRecord = {
+  inward_id?: string
   stock_inward_id?: string
   entry_date?: string
   inward_date?: string
@@ -32,6 +33,7 @@ type StockInwardRecord = {
   raw_weight_kg?: number
   created_at?: string
   notes?: string
+  remarks?: string
   companies?: { name?: string } | null
   sheds?: { name?: string } | null
 }
@@ -95,7 +97,7 @@ export default function StockInwardTable({
       row.companies?.name || '-',
       row.sheds?.name || '-',
       String(Number(row.raw_weight_kg || 0).toFixed(2)),
-      row.notes || '-',
+      row.notes || row.remarks || '-',
     ])
     downloadCsv(`stock_inward_${new Date().toISOString().slice(0, 10)}.csv`, headers, csvRows)
   }
@@ -167,12 +169,12 @@ export default function StockInwardTable({
               </TableRow>
             ) : (
               filteredRows.map((row, i) => (
-                <TableRow key={row.stock_inward_id || i}>
+                <TableRow key={row.stock_inward_id || row.inward_id || i}>
                   <TableCell>{formatDate(resolveEntryDate(row))}</TableCell>
                   <TableCell>{row.companies?.name || '-'}</TableCell>
                   <TableCell>{row.sheds?.name || '-'}</TableCell>
                   <TableCell className="text-right">{Number(row.raw_weight_kg || 0).toFixed(2)}</TableCell>
-                  <TableCell>{row.notes || '-'}</TableCell>
+                  <TableCell>{row.notes || row.remarks || '-'}</TableCell>
                 </TableRow>
               ))
             )}

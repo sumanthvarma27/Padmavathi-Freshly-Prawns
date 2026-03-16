@@ -1,21 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import CompanyRatesClient from './client'
 
-type CompanyRow = {
-  company_id: string
-  name: string
-}
-
-type CompanyRateJoined = {
-  company_rate_id: string
-  company_id: string
-  rate_per_kg: number
-  effective_from: string
-  effective_to: string | null
-  is_active: boolean
-  companies?: { name?: string } | null
-}
-
 export default async function CompanyRatesPage() {
   const supabase = await createClient()
 
@@ -25,28 +10,38 @@ export default async function CompanyRatesPage() {
     .eq('is_active', true)
     .order('name')
 
+  const { data: processingTypes } = await supabase
+    .from('processing_types')
+    .select('processing_type_id,name')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+
+  const { data: countRanges } = await supabase
+    .from('count_ranges')
+    .select('count_range_id,label,sort_order')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+
   const { data: rates, error } = await supabase
     .from('company_rates')
-    .select('*,companies(name)')
+    .select('*,companies(name),processing_types(name),count_ranges(label)')
     .order('effective_from', { ascending: false })
 
   if (error) {
     return (
       <div className="space-y-4">
         <h1 className="text-3xl font-bold tracking-tight">Company Rates</h1>
-        <p className="text-red-600">
-          Could not load company rates: {error.message}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Create `company_rates` table (effective-dated) to enable this module.
-        </p>
+        <p className="text-red-600">Could not load company rates: {error.message}</p>
       </div>
     )
   }
 
-  const formattedRates = ((rates as CompanyRateJoined[] | null) || []).map((r) => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const formattedRates = ((rates as any[] | null) || []).map((r) => ({
     ...r,
     company_name: r.companies?.name || '-',
+    processing_type_name: r.processing_types?.name || '-',
+    count_range_label: r.count_ranges?.label || '-',
   }))
 
   return (
@@ -57,7 +52,9 @@ export default async function CompanyRatesPage() {
       </div>
       <CompanyRatesClient
         initialRates={formattedRates}
-        companies={((companies as CompanyRow[] | null) || [])}
+        companies={(companies as { company_id: string; name: string }[] | null) || []}
+        processingTypes={(processingTypes as { processing_type_id: string; name: string }[] | null) || []}
+        countRanges={(countRanges as { count_range_id: string; label: string }[] | null) || []}
       />
     </div>
   )

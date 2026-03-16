@@ -17,7 +17,6 @@ import { StockInwardScreen } from './StockInwardScreen'
 import { ProcessingEntryScreen } from './ProcessingEntryScreen'
 import type { StockInwardContext } from '../types/workflow'
 
-// ─── Active section tabs ──────────────────────────────────────────────────────
 type ActiveSection = 'stock_inward' | 'processing'
 
 export function HomeScreen() {
@@ -115,7 +114,6 @@ export function HomeScreen() {
     await refreshLots(masterData)
     refreshUnsyncedCount()
     if (lotId) setSelectedStockId(lotId)
-    // After saving a stock inward, stay on stock_inward tab to show updated list
   }
 
   const onProcessingSaved = async () => {
@@ -147,11 +145,9 @@ export function HomeScreen() {
     }
   }
 
-  // Navigate to Processing Entry for a specific lot
   const onGoToProcessing = (lotId: string) => {
     setSelectedStockId(lotId)
     setActiveSection('processing')
-    // Scroll to top of content area so processing entry is visible
     setTimeout(() => {
       scrollRef.current?.scrollTo({ y: 0, animated: true })
     }, 100)
@@ -181,7 +177,6 @@ export function HomeScreen() {
 
   return (
     <View style={styles.page}>
-      {/* ── Header ──────────────────────────────────────────── */}
       <View style={styles.header}>
         <Text style={styles.title}>Shed Operations</Text>
         <View style={styles.headerRight}>
@@ -201,7 +196,6 @@ export function HomeScreen() {
         </View>
       </View>
 
-      {/* ── Summary Strip ──────────────────────────────────── */}
       <View style={styles.summaryRow}>
         <View style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>Open Lots</Text>
@@ -220,6 +214,7 @@ export function HomeScreen() {
           </Text>
         </View>
       </View>
+
       {syncStatus && (
         <View
           style={[
@@ -233,43 +228,22 @@ export function HomeScreen() {
         </View>
       )}
 
-      {/* ── Section Tabs ───────────────────────────────────── */}
-      <View style={styles.tabBar}>
-        <Pressable
-          style={[styles.tab, activeSection === 'stock_inward' && styles.tabActive]}
-          onPress={() => setActiveSection('stock_inward')}
-        >
-          <Text style={[styles.tabText, activeSection === 'stock_inward' && styles.tabTextActive]}>
-            📦 Stock Inward
+      {activeSection === 'processing' && selectedStock ? (
+        <View style={styles.processingHeaderBar}>
+          <Text style={styles.processingHeaderText}>Processing Entry</Text>
+          <Text style={styles.processingHeaderMeta}>
+            {selectedStock.shedLabel} · {selectedStock.companyLabel}
           </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tab, activeSection === 'processing' && styles.tabActive]}
-          onPress={() => setActiveSection('processing')}
-        >
-          <Text style={[styles.tabText, activeSection === 'processing' && styles.tabTextActive]}>
-            ⚙️ Processing Entry
-          </Text>
-          {selectedStock && (
-            <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>
-                {selectedStock.shedLabel} · {selectedStock.companyLabel}
-              </Text>
-            </View>
-          )}
-        </Pressable>
-      </View>
+        </View>
+      ) : null}
 
-      {/* ── Content ────────────────────────────────────────── */}
       <ScrollView ref={scrollRef} style={styles.content} contentContainerStyle={styles.contentWrap}>
         {activeSection === 'stock_inward' ? (
           <>
-            {/* Stock Inward Form */}
             <View style={styles.sectionCard}>
               <StockInwardScreen masterData={masterData} onStockSaved={onStockSaved} />
             </View>
 
-            {/* Stock Inwards List */}
             <View style={styles.sectionCard}>
               <View style={styles.listHeader}>
                 <Text style={styles.listTitle}>Stock Inwards</Text>
@@ -282,7 +256,6 @@ export function HomeScreen() {
                 </View>
               ) : (
                 <View style={styles.inwardList}>
-                  {/* Column Headers */}
                   <View style={styles.inwardTableHeader}>
                     <Text style={[styles.colHeader, { flex: 2 }]}>Date · Shed · Company</Text>
                     <Text style={[styles.colHeader, { flex: 1, textAlign: 'right' }]}>Raw (kg)</Text>
@@ -305,22 +278,17 @@ export function HomeScreen() {
                           isSelected && styles.inwardRowSelected,
                         ]}
                       >
-                        {/* Label column */}
                         <View style={{ flex: 2 }}>
-                          <Text style={styles.inwardLabel}>
-                            {stock.entryDate}
-                          </Text>
+                          <Text style={styles.inwardLabel}>{stock.entryDate}</Text>
                           <Text style={styles.inwardSub}>
                             {stock.shedLabel} · {stock.companyLabel}
                           </Text>
                         </View>
 
-                        {/* Raw weight */}
                         <Text style={[styles.inwardNum, { flex: 1, textAlign: 'right' }]}>
                           {stock.rawWeightKg.toFixed(1)}
                         </Text>
 
-                        {/* Balance */}
                         <Text
                           style={[
                             styles.inwardNum,
@@ -331,7 +299,6 @@ export function HomeScreen() {
                           {balance.toFixed(1)}
                         </Text>
 
-                        {/* Status badge */}
                         <View style={{ width: 72, alignItems: 'center' }}>
                           <View style={[styles.statusBadge, isClosed ? styles.statusClosed : styles.statusOpen]}>
                             <Text style={styles.statusBadgeText}>
@@ -340,7 +307,6 @@ export function HomeScreen() {
                           </View>
                         </View>
 
-                        {/* Process button */}
                         <View style={{ width: 112, alignItems: 'center' }}>
                           <Pressable
                             style={[
@@ -363,9 +329,7 @@ export function HomeScreen() {
             </View>
           </>
         ) : (
-          /* Processing Entry Section */
           <View style={styles.sectionCard}>
-            {/* Selected stock context banner */}
             {selectedStock && (
               <View style={styles.processingBanner}>
                 <View style={styles.processingBannerInfo}>
@@ -415,7 +379,6 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
   muted: { color: '#64748b' },
 
-  // Header
   header: {
     paddingHorizontal: 16,
     paddingTop: 16,
@@ -454,7 +417,6 @@ const styles = StyleSheet.create({
   closeButtonText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   disabled: { opacity: 0.45 },
 
-  // Summary
   summaryRow: {
     paddingHorizontal: 16,
     paddingTop: 10,
@@ -488,36 +450,26 @@ const styles = StyleSheet.create({
   syncStatusInfo: { backgroundColor: '#eff6ff', borderColor: '#3b82f6' },
   syncStatusText: { color: '#0f172a', fontWeight: '600', fontSize: 13 },
 
-  // Tabs
-  tabBar: {
-    flexDirection: 'row',
+  processingHeaderBar: {
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
     paddingHorizontal: 16,
-    gap: 4,
+    paddingTop: 10,
+    paddingBottom: 10,
   },
-  tab: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  processingHeaderText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
   },
-  tabActive: { borderBottomColor: '#15803d' },
-  tabText: { color: '#64748b', fontWeight: '700', fontSize: 14 },
-  tabTextActive: { color: '#15803d' },
-  tabBadge: {
-    backgroundColor: '#dcfce7',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+  processingHeaderMeta: {
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#15803d',
   },
-  tabBadgeText: { color: '#166534', fontSize: 11, fontWeight: '700' },
 
-  // Content
   content: { flex: 1 },
   contentWrap: { padding: 16, gap: 14, paddingBottom: 32 },
   sectionCard: {
@@ -529,7 +481,6 @@ const styles = StyleSheet.create({
     padding: 14,
   },
 
-  // Stock Inwards List
   listHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -575,7 +526,6 @@ const styles = StyleSheet.create({
   inwardNum: { color: '#334155', fontWeight: '700', fontSize: 13 },
   inwardNumDone: { color: '#16a34a' },
 
-  // Status badge
   statusBadge: {
     borderRadius: 6,
     paddingHorizontal: 7,
@@ -585,7 +535,6 @@ const styles = StyleSheet.create({
   statusClosed: { backgroundColor: '#e2e8f0' },
   statusBadgeText: { fontSize: 10, fontWeight: '800', color: '#374151' },
 
-  // Process button in list
   processBtn: {
     backgroundColor: '#15803d',
     borderRadius: 8,
@@ -596,7 +545,6 @@ const styles = StyleSheet.create({
   processBtnDisabled: { backgroundColor: '#cbd5e1' },
   processBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
 
-  // Processing tab banner
   processingBanner: {
     flexDirection: 'row',
     alignItems: 'center',

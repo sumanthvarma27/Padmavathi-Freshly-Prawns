@@ -5,6 +5,8 @@ import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { getRoleForUser, isAdminRole } from '@/lib/auth/role'
 
+const APP_VERSION = 'v0.1.0'
+
 export default async function AdminLayout({
   children,
 }: {
@@ -26,6 +28,12 @@ export default async function AdminLayout({
     if (role === 'supervisor') redirect('/supervisor-info')
     redirect('/unauthorized')
   }
+
+  const buildDate = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
 
   async function signOut() {
     'use server'
@@ -79,6 +87,9 @@ export default async function AdminLayout({
           </div>
         </nav>
       </header>
+      <div className="border-b bg-emerald-50 px-4 py-1 text-[11px] font-medium tracking-wide text-emerald-800 md:px-6">
+        Admin Web {APP_VERSION} | {buildDate}
+      </div>
       <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
     </div>
   )

@@ -1,8 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, AlertCircle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { AlertCircle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -54,47 +53,13 @@ export default function ReportsClient({
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
 
-  // Filter Data
   const filteredData = data.filter(row => {
     if (filterCompany !== 'all' && row.company_id !== filterCompany) return false
     if (filterShed !== 'all' && row.shed_id !== filterShed) return false
-    
-    // Simple date string compare works if both are YYYY-MM-DD
     if (startDate && row.summary_date < startDate) return false
     if (endDate && row.summary_date > endDate) return false
-    
     return true
   })
-
-  // Export to CSV
-  const handleExportCSV = () => {
-    if (filteredData.length === 0) return
-
-    const headers = ['Date', 'Company', 'Shed', 'Raw Wt (kg)', 'Processed Wt (kg)', 'Loss/Diff (kg)', 'Yield %']
-    const csvRows = [
-      headers.join(','), // Header row
-      ...filteredData.map(row => [
-        row.summary_date,
-        // Wrap strings in quotes in case they contain commas
-        `"${row.company_name || '-'}"`,
-        `"${row.shed_name || '-'}"`,
-        row.raw_weight_kg?.toFixed(2) || '0.00',
-        row.processed_weight_kg?.toFixed(2) || '0.00',
-        row.diff_kg?.toFixed(2) || '0.00',
-        row.yield_percent?.toFixed(2) || '0.00'
-      ].join(','))
-    ]
-
-    const csvContent = csvRows.join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', `daily_summary_${new Date().toISOString().slice(0,10)}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
 
   return (
     <div className="space-y-6">
@@ -140,10 +105,6 @@ export default function ReportsClient({
           Showing {filteredData.length} records
         </p>
         <div className="flex items-center gap-2">
-          <Button onClick={handleExportCSV} disabled={filteredData.length === 0} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
-            <Download className="h-4 w-4" />
-            Export CSV
-          </Button>
           <PrintButton />
         </div>
       </div>

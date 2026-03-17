@@ -229,10 +229,10 @@ export default function WorkerRatesClient({
 
       if (res?.error) throw new Error(res.error)
 
-      if (res?.skipped) {
+      if ('skipped' in res && res.skipped) {
         toast.info(res.message || 'Skipped overlapping rate entry.')
       } else {
-        toast.success(res?.message || (editingRate ? 'Rate updated successfully.' : 'Rate added successfully.'))
+        toast.success(res.message || (editingRate ? 'Rate updated successfully.' : 'Rate added successfully.'))
       }
 
       setIsModalOpen(false)

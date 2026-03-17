@@ -10,6 +10,16 @@ import {
   TableRow,
 } from '@/components/ui/table'
 
+type LotRow = {
+  lot_id: string
+  entry_date: string
+  raw_weight_kg: number | null
+  processed_weight_kg: number | null
+  status: string
+  companies?: { name?: string | null } | null
+  sheds?: { name?: string | null } | null
+}
+
 export default async function StockLotsOpsPage() {
   const supabase = await createClient()
 
@@ -46,7 +56,7 @@ export default async function StockLotsOpsPage() {
                 <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">No lots available.</TableCell>
               </TableRow>
             ) : (
-              (lots || []).map((lot: any) => {
+              ((lots as LotRow[] | null) || []).map((lot) => {
                 const raw = Number(lot.raw_weight_kg || 0)
                 const processed = Number(lot.processed_weight_kg || 0)
                 const balance = raw - processed
@@ -69,7 +79,8 @@ export default async function StockLotsOpsPage() {
                         <form
                           action={async () => {
                             'use server'
-                            await closeStockLot(lot.lot_id, 'Closed from admin stock lots page')
+                            const result = await closeStockLot(lot.lot_id, 'Closed from admin stock lots page')
+                            if (result?.error) throw new Error(result.error)
                           }}
                         >
                           <Button variant="outline" size="sm" type="submit">Close</Button>
@@ -78,7 +89,8 @@ export default async function StockLotsOpsPage() {
                         <form
                           action={async () => {
                             'use server'
-                            await reopenStockLot(lot.lot_id, 'Reopened from admin stock lots page')
+                            const result = await reopenStockLot(lot.lot_id, 'Reopened from admin stock lots page')
+                            if (result?.error) throw new Error(result.error)
                           }}
                         >
                           <Button variant="outline" size="sm" type="submit">Reopen</Button>

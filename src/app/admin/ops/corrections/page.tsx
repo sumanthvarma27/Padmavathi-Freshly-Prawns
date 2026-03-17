@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { editProcessingWeight, voidProcessingEntry } from './actions'
+import { editProcessingWeight, resetOperationalTestData, voidProcessingEntry } from './actions'
 
 export default async function CorrectionsPage() {
   const supabase = await createClient()
@@ -32,6 +32,20 @@ export default async function CorrectionsPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Corrections & Audit</h1>
         <p className="text-muted-foreground">Void/edit with mandatory reason and immutable audit trail.</p>
+      </div>
+
+
+      <div className="rounded-md border bg-white p-4 space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold">Reset All Operational Transactions</h2>
+          <p className="text-sm text-muted-foreground">
+            Clears all current stock inwards, processing lots, processing entries, and their audit trails. Master setup like companies,
+            sheds, batches, workers, rates, processing types, and count ranges will stay untouched.
+          </p>
+        </div>
+        <form action={resetOperationalTestData}>
+          <Button type="submit" variant="destructive">Clear All Transactions</Button>
+        </form>
       </div>
 
       <div className="rounded-md border bg-white overflow-x-auto">

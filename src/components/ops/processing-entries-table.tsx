@@ -1,8 +1,6 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Download } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -54,21 +52,6 @@ function resolveDate(row: ProcessingEntry) {
   return row.entry_date || row.created_at || ''
 }
 
-function downloadCsv(filename: string, headers: string[], rows: string[][]) {
-  const escape = (v: string) => `"${v.replaceAll('"', '""')}"`
-  const csv = [headers, ...rows].map((r) => r.map(escape).join(',')).join('\n')
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
-}
-
 export default function ProcessingEntriesTable({
   rows,
   sheds,
@@ -106,22 +89,6 @@ export default function ProcessingEntriesTable({
       return true
     })
   }, [rows, shedId, companyId, batchId, startDate, endDate])
-
-  const onExport = () => {
-    const headers = ['Date', 'Company', 'Shed', 'Batch', 'Processing Type', 'Count Range', 'Processed Weight (kg)', 'Rate Snapshot', 'Amount Snapshot']
-    const csvRows = filteredRows.map((row) => [
-      formatDate(resolveDate(row)),
-      row.companies?.name || '-',
-      row.sheds?.name || '-',
-      row.batches?.batch_code || row.batches?.batch_name || '-',
-      row.processing_types?.name || '-',
-      row.count_ranges?.label || '-',
-      String(Number(row.processed_weight_kg || 0).toFixed(2)),
-      String(Number(row.rate_per_kg_snapshot || 0).toFixed(2)),
-      String(Number(row.amount_snapshot || 0).toFixed(2)),
-    ])
-    downloadCsv(`processing_entries_${new Date().toISOString().slice(0, 10)}.csv`, headers, csvRows)
-  }
 
   return (
     <div className="space-y-4">
@@ -176,10 +143,6 @@ export default function ProcessingEntriesTable({
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">Showing {filteredRows.length} records</p>
-        <Button onClick={onExport} disabled={filteredRows.length === 0} className="gap-2">
-          <Download className="h-4 w-4" />
-          Export CSV
-        </Button>
       </div>
 
       <div className="rounded-md border bg-white overflow-x-auto">

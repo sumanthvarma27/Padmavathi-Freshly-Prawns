@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getOperationalReports } from '@/lib/reports/operational-reporting'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -10,42 +11,30 @@ import {
 } from '@/components/ui/table'
 import PrintButton from '@/components/reports/print-button'
 
-type DailySummaryRow = {
-  summary_date: string
-  company_id: string
-  shed_id: string
-  company_name: string
-  shed_name: string
-  raw_weight_kg: number
-  processed_weight_kg: number
-  diff_kg: number
-  yield_percent: number
-}
-
 export default async function ReconciliationReportPage() {
   const supabase = await createClient()
+  const { dayReports } = await getOperationalReports(supabase as never, { status: 'all' })
 
-  const [{ data: summary }] = await Promise.all([
-    supabase.from('v_daily_summary').select('*').order('summary_date', { ascending: false }).limit(100),
-  ])
-
-  const totalRaw = ((summary as DailySummaryRow[] | null) || []).reduce((sum: number, r) => sum + Number(r.raw_weight_kg || 0), 0)
-  const totalProcessed = ((summary as DailySummaryRow[] | null) || []).reduce((sum: number, r) => sum + Number(r.processed_weight_kg || 0), 0)
+  const totalRaw = dayReports.reduce((sum, row) => sum + row.totalStockInwardKg, 0)
+  const totalProcessed = dayReports.reduce((sum, row) => sum + row.totalProcessedKg, 0)
+  const totalWorkerPayout = dayReports.reduce((sum, row) => sum + row.totalWorkerPayout, 0)
+  const totalCompanyPayout = dayReports.reduce((sum, row) => sum + row.totalCompanyPayout, 0)
 
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-        <h1 className="text-3xl font-bold tracking-tight">Reconciliation</h1>
-        <p className="text-muted-foreground">Raw vs processed vs paid variance overview.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Reconciliation</h1>
+          <p className="text-muted-foreground">Raw vs processed vs worker payout vs company payout variance overview.</p>
         </div>
         <PrintButton />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card><CardHeader><CardTitle>Total Raw (kg)</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{totalRaw.toFixed(2)}</CardContent></Card>
         <Card><CardHeader><CardTitle>Total Processed (kg)</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{totalProcessed.toFixed(2)}</CardContent></Card>
-        <Card><CardHeader><CardTitle>Variance (kg)</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{(totalRaw - totalProcessed).toFixed(2)}</CardContent></Card>
+        <Card><CardHeader><CardTitle>Worker Payout</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{totalWorkerPayout.toFixed(2)}</CardContent></Card>
+        <Card><CardHeader><CardTitle>Company Payout</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{totalCompanyPayout.toFixed(2)}</CardContent></Card>
       </div>
 
       <div className="rounded-md border bg-white overflow-x-auto">
@@ -53,27 +42,33 @@ export default async function ReconciliationReportPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
-              <TableHead>Company</TableHead>
-              <TableHead>Shed</TableHead>
               <TableHead className="text-right">Raw</TableHead>
               <TableHead className="text-right">Processed</TableHead>
               <TableHead className="text-right">Diff</TableHead>
               <TableHead className="text-right">Yield %</TableHead>
+              <TableHead className="text-right">Worker Payout</TableHead>
+              <TableHead className="text-right">Company Payout</TableHead>
+              <TableHead className="text-right">Net</TableHead>
+              <TableHead className="text-right">Lots</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(summary || []).length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No summary rows.</TableCell></TableRow>
+            {dayReports.length === 0 ? (
+              <TableRow><TableCell colSpan={9} className="h-24 text-center text-muted-foreground">No closed day reports yet.</TableCell></TableRow>
             ) : (
-              ((summary as DailySummaryRow[] | null) || []).map((row, i: number) => (
-                <TableRow key={`${row.summary_date}-${row.company_id}-${row.shed_id}-${i}`}>
-                  <TableCell>{row.summary_date}</TableCell>
-                  <TableCell>{row.company_name || '-'}</TableCell>
-                  <TableCell>{row.shed_name || '-'}</TableCell>
-                  <TableCell className="text-right">{Number(row.raw_weight_kg || 0).toFixed(2)}</TableCell>
-                  <TableCell className="text-right">{Number(row.processed_weight_kg || 0).toFixed(2)}</TableCell>
-                  <TableCell className="text-right">{Number(row.diff_kg || 0).toFixed(2)}</TableCell>
-                  <TableCell className="text-right">{Number(row.yield_percent || 0).toFixed(2)}%</TableCell>
+              dayReports.map((row) => (
+                <TableRow key={row.reportDate}>
+                  <TableCell>{row.reportDate}</TableCell>
+                  <TableCell className="text-right">{row.totalStockInwardKg.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{row.totalProcessedKg.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{row.totalVariationKg.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{row.avgYieldPercent.toFixed(2)}%</TableCell>
+                  <TableCell className="text-right">{row.totalWorkerPayout.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{row.totalCompanyPayout.toFixed(2)}</TableCell>
+                  <TableCell className={`text-right font-semibold ${row.netAmount >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                    {row.netAmount.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right">{row.lotReports.length}</TableCell>
                 </TableRow>
               ))
             )}

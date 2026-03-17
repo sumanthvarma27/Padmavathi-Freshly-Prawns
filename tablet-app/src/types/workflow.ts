@@ -8,6 +8,11 @@ export type StockInwardContext = {
   companyLabel: string
   rawWeightKg: number
   processedWeightKg: number
+  processingTypeId?: string
+  processingTypeLabel?: string
+  countRangeId?: string
+  countRangeLabel?: string
+  workerRatePerKg?: number
   status: 'open' | 'closed'
   closedAt?: string
 }

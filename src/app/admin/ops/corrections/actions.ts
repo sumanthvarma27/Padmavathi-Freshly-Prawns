@@ -129,6 +129,66 @@ export async function voidProcessingEntry(entryId: string, reason: string) {
   return { success: true }
 }
 
+
+export async function resetOperationalTestData() {
+  const supabase = await createClient()
+
+  const idColumn = await getProcessingEntryIdColumn(supabase)
+
+  const memberDelete = await supabase
+    .from('processing_entry_members')
+    .delete()
+    .not('processing_entry_member_id', 'is', null)
+  if (memberDelete.error) return { error: memberDelete.error.message }
+
+  const auditDelete = await supabase
+    .from('processing_entry_audit')
+    .delete()
+    .not('audit_id', 'is', null)
+  if (auditDelete.error) return { error: auditDelete.error.message }
+
+  const entryDelete = await supabase
+    .from('processing_entries')
+    .delete()
+    .not(idColumn, 'is', null)
+  if (entryDelete.error) return { error: entryDelete.error.message }
+
+  const lotActionDelete = await supabase
+    .from('processing_lot_actions')
+    .delete()
+    .not('action_id', 'is', null)
+  if (lotActionDelete.error) return { error: lotActionDelete.error.message }
+
+  const lotDelete = await supabase
+    .from('processing_lots')
+    .delete()
+    .not('lot_id', 'is', null)
+  if (lotDelete.error) return { error: lotDelete.error.message }
+
+  const stockDelete = await supabase
+    .from('stock_inward')
+    .delete()
+    .not('inward_id', 'is', null)
+  if (stockDelete.error) return { error: stockDelete.error.message }
+
+  revalidatePath('/admin/ops/corrections')
+  revalidatePath('/admin/ops/processing-entries')
+  revalidatePath('/admin/ops/stock-lots')
+  revalidatePath('/admin/ops/stock-inward')
+  revalidatePath('/admin/reports')
+  revalidatePath('/admin/reports/day-end')
+  revalidatePath('/admin/reports/lot-closure')
+  revalidatePath('/admin/reports/profitability')
+  revalidatePath('/admin/reports/reconciliation')
+  revalidatePath('/admin/reports/payroll')
+  revalidatePath('/admin/reports/payroll-members')
+  revalidatePath('/admin/reports/daily-summary')
+  revalidatePath('/admin/reports/unbalanced')
+  revalidatePath('/admin/exports')
+
+  return { success: true }
+}
+
 export async function editProcessingWeight(entryId: string, processedWeightKg: number, reason: string) {
   const supabase = await createClient()
   if (!reason.trim()) {

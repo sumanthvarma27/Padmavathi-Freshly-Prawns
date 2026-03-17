@@ -4,6 +4,9 @@ type StockInwardInput = {
   entryDate: string
   shedId: string
   companyId: string
+  processingTypeId: string
+  countRangeId: string
+  ratePerKgSnapshot: number
   rawWeightKg: number
 }
 
@@ -83,14 +86,21 @@ export async function submitStockInward(input: StockInwardInput): Promise<{ stoc
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Session expired. Please login again.')
 
+  const remarks = JSON.stringify({
+    processingTypeId: input.processingTypeId,
+    ratePerKgSnapshot: input.ratePerKgSnapshot,
+  })
+
   const { data, error } = await supabase
     .from('stock_inward')
     .insert({
       inward_date: input.entryDate,
       shed_id: input.shedId,
       company_id: input.companyId,
+      count_range_id: input.countRangeId,
       raw_weight_kg: input.rawWeightKg,
-      created_by: user?.id ?? null,   // required: NOT NULL column
+      remarks,
+      created_by: user?.id ?? null,
     })
     .select('inward_id')
     .single()
@@ -98,19 +108,54 @@ export async function submitStockInward(input: StockInwardInput): Promise<{ stoc
   if (error) throw error
 
   const stockInwardId = data.inward_id as string
+  let lotId: string | undefined
 
-  // Wait briefly for the DB trigger to create the processing_lot
-  await new Promise((r) => setTimeout(r, 400))
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await new Promise((r) => setTimeout(r, 300))
 
-  const { data: lotData } = await supabase
-    .from('processing_lots')
-    .select('lot_id')
-    .eq('stock_inward_id', stockInwardId)
-    .maybeSingle()
+    const { data: lotData, error: lotLookupError } = await supabase
+      .from('processing_lots')
+      .select('lot_id')
+      .eq('stock_inward_id', stockInwardId)
+      .maybeSingle()
+
+    if (lotLookupError) throw lotLookupError
+    if (lotData?.lot_id) {
+      lotId = lotData.lot_id as string
+      break
+    }
+  }
+
+  if (!lotId) {
+    const { error: createLotError } = await supabase
+      .from('processing_lots')
+      .insert({
+        stock_inward_id: stockInwardId,
+        entry_date: input.entryDate,
+        shed_id: input.shedId,
+        company_id: input.companyId,
+        raw_weight_kg: input.rawWeightKg,
+        processed_weight_kg: 0,
+        status: 'open',
+      })
+
+    if (createLotError) {
+      console.warn('[submitStockInward] direct processing_lot creation failed:', createLotError.message)
+    } else {
+      const { data: lotData, error: lotLookupError } = await supabase
+        .from('processing_lots')
+        .select('lot_id')
+        .eq('stock_inward_id', stockInwardId)
+        .maybeSingle()
+
+      if (lotLookupError) throw lotLookupError
+      lotId = lotData?.lot_id as string | undefined
+    }
+  }
 
   return {
     stockInwardId,
-    lotId: lotData?.lot_id as string | undefined,
+    lotId,
   }
 }
 

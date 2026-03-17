@@ -3,7 +3,6 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { PickerField } from '../components/PickerField'
 import { QRScannerModal } from '../components/QRScannerModal'
 import type { MasterData } from '../types/db'
-import { getWorkerRate } from '../lib/rates'
 import { submitProcessingEntryAtomic } from '../lib/transactions'
 import { enqueue } from '../lib/offline-queue'
 import type { StockInwardContext } from '../types/workflow'
@@ -28,10 +27,7 @@ export function ProcessingEntryScreen({
   onProcessingSaved: () => void
 }) {
   const [batchId, setBatchId] = useState('')
-  const [processingTypeId, setProcessingTypeId] = useState('')
-  const [countRangeId, setCountRangeId] = useState('')
   const [memberWeights, setMemberWeights] = useState<Record<string, string>>({})
-  const [ratePerKg, setRatePerKg] = useState<number | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState<{
@@ -58,11 +54,13 @@ export function ProcessingEntryScreen({
     }, 0)
   }, [batchMembers, memberWeights])
 
+  const fixedRatePerKg = selectedStock?.workerRatePerKg ?? null
+
   const amountPreview = useMemo(() => {
     const weight = totalWeightKg
-    if (Number.isNaN(weight) || weight <= 0 || ratePerKg == null) return null
-    return Number((weight * ratePerKg).toFixed(2))
-  }, [totalWeightKg, ratePerKg])
+    if (Number.isNaN(weight) || weight <= 0 || fixedRatePerKg == null) return null
+    return Number((weight * fixedRatePerKg).toFixed(2))
+  }, [totalWeightKg, fixedRatePerKg])
 
   const onScanResult = (code: string) => {
     const normalized = code.trim()
@@ -80,36 +78,6 @@ export function ProcessingEntryScreen({
     setMemberWeights({})
   }
 
-  const onLookupRate = async () => {
-    if (!processingTypeId || !countRangeId) {
-      setStatus({ type: 'error', title: 'Missing fields', message: 'Select processing type and count range first.' })
-      Alert.alert('Missing fields', 'Select processing type and count range first.')
-      return
-    }
-    if (!selectedStock) {
-      Alert.alert('Select stock inward', 'Create or select a stock inward first.')
-      return
-    }
-    if (selectedStock.status === 'closed') {
-      Alert.alert('Stock closed', 'Selected stock inward is closed. Create/select an open stock inward.')
-      return
-    }
-
-    try {
-      const rate = await getWorkerRate({
-        processingTypeId,
-        countRangeId,
-        effectiveAt: `${selectedStock.entryDate}T00:00:00`,
-      })
-      setRatePerKg(rate)
-      setStatus({ type: 'success', title: 'Rate loaded', message: `Rate: ${rate.toFixed(2)} / kg` })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Rate lookup failed.'
-      setStatus({ type: 'error', title: 'Rate not found', message })
-      Alert.alert('Rate not found', message)
-    }
-  }
-
   const onSave = async () => {
     setStatus(null)
     const weight = totalWeightKg
@@ -122,19 +90,23 @@ export function ProcessingEntryScreen({
       Alert.alert('Stock closed', 'Selected stock inward is closed. Create/select an open stock inward.')
       return
     }
-    if (!batchId || !processingTypeId || !countRangeId) {
-      setStatus({ type: 'error', title: 'Missing fields', message: 'Fill all required fields.' })
-      Alert.alert('Missing fields', 'Fill all required fields.')
+    if (!selectedStock.processingTypeId || !selectedStock.countRangeId || fixedRatePerKg == null) {
+      setStatus({
+        type: 'error',
+        title: 'Stock config missing',
+        message: 'This stock inward is missing its fixed processing type, count range, or rate.',
+      })
+      Alert.alert('Stock config missing', 'Save a stock inward with processing type, count range, and fixed rate first.')
+      return
+    }
+    if (!batchId) {
+      setStatus({ type: 'error', title: 'Batch missing', message: 'Select a batch first.' })
+      Alert.alert('Batch missing', 'Select a batch first.')
       return
     }
     if (Number.isNaN(weight) || weight <= 0) {
       setStatus({ type: 'error', title: 'Invalid weight', message: 'Processed weight must be greater than 0.' })
       Alert.alert('Invalid weight', 'Processed weight must be greater than 0.')
-      return
-    }
-    if (ratePerKg == null) {
-      setStatus({ type: 'error', title: 'Rate missing', message: 'Lookup worker rate before saving.' })
-      Alert.alert('Rate missing', 'Lookup worker rate before saving.')
       return
     }
     if (batchMembers.length === 0) {
@@ -154,22 +126,25 @@ export function ProcessingEntryScreen({
       Alert.alert('No member weights', 'Enter at least one member weight.')
       return
     }
+
     const remaining = selectedStock.rawWeightKg - selectedStock.processedWeightKg
     if (weight > remaining) {
       Alert.alert('Exceeds available stock', `Only ${remaining.toFixed(2)} kg is left in selected stock inward.`)
       return
     }
 
+    const payload = {
+      lotId: selectedStock.id,
+      batchId,
+      processingTypeId: selectedStock.processingTypeId,
+      countRangeId: selectedStock.countRangeId,
+      ratePerKgSnapshot: fixedRatePerKg,
+      memberWeights: selectedMemberWeights,
+    }
+
     setSaving(true)
     try {
-      const result = await submitProcessingEntryAtomic({
-        lotId: selectedStock.id,
-        batchId,
-        processingTypeId,
-        countRangeId,
-        ratePerKgSnapshot: ratePerKg,
-        memberWeights: selectedMemberWeights,
-      })
+      const result = await submitProcessingEntryAtomic(payload)
 
       onProcessingSaved()
       setMemberWeights({})
@@ -186,14 +161,7 @@ export function ProcessingEntryScreen({
       if (isLikelyNetworkError(error)) {
         await enqueue({
           type: 'processing_round',
-          payload: {
-            lotId: selectedStock.id,
-            batchId,
-            processingTypeId,
-            countRangeId,
-            ratePerKgSnapshot: ratePerKg,
-            memberWeights: selectedMemberWeights,
-          },
+          payload,
         })
         onProcessingSaved()
         setMemberWeights({})
@@ -239,6 +207,9 @@ export function ProcessingEntryScreen({
           <Text style={styles.stockCardText}>Date: {selectedStock.entryDate}</Text>
           <Text style={styles.stockCardText}>Shed: {selectedStock.shedLabel}</Text>
           <Text style={styles.stockCardText}>Company: {selectedStock.companyLabel}</Text>
+          <Text style={styles.stockCardText}>Processing Type: {selectedStock.processingTypeLabel || '-'}</Text>
+          <Text style={styles.stockCardText}>Count Range: {selectedStock.countRangeLabel || '-'}</Text>
+          <Text style={styles.stockCardText}>Fixed Rate: {selectedStock.workerRatePerKg == null ? '-' : `${selectedStock.workerRatePerKg.toFixed(2)} / kg`}</Text>
           <Text style={styles.stockCardText}>Raw: {selectedStock.rawWeightKg.toFixed(2)} kg</Text>
           <Text style={styles.stockCardText}>Used: {selectedStock.processedWeightKg.toFixed(2)} kg</Text>
           <Text style={styles.stockCardText}>Balance: {(selectedStock.rawWeightKg - selectedStock.processedWeightKg).toFixed(2)} kg</Text>
@@ -253,32 +224,6 @@ export function ProcessingEntryScreen({
           <Text style={styles.secondaryButtonText}>Scan Batch QR</Text>
         </Pressable>
         <Text style={styles.codeText}>{batchCode ? `Code: ${batchCode}` : 'No batch scanned'}</Text>
-      </View>
-
-      <PickerField
-        label="Processing Type"
-        selectedValue={processingTypeId}
-        options={masterData.processingTypes}
-        onValueChange={(value) => {
-          setProcessingTypeId(value)
-          setRatePerKg(null)
-        }}
-      />
-      <PickerField
-        label="Count Range"
-        selectedValue={countRangeId}
-        options={masterData.countRanges}
-        onValueChange={(value) => {
-          setCountRangeId(value)
-          setRatePerKg(null)
-        }}
-      />
-
-      <View style={styles.row}>
-        <Pressable style={styles.secondaryButton} onPress={onLookupRate}>
-          <Text style={styles.secondaryButtonText}>Lookup Rate</Text>
-        </Pressable>
-        <Text style={styles.rateText}>{ratePerKg == null ? 'Rate: -' : `Rate: ${ratePerKg.toFixed(2)} / kg`}</Text>
       </View>
 
       <View style={styles.field}>
@@ -337,14 +282,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   field: { gap: 6 },
   label: { fontSize: 14, fontWeight: '600', color: '#0f172a' },
-  input: {
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
   secondaryButton: {
     backgroundColor: '#0f766e',
     borderRadius: 8,
@@ -353,7 +290,6 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: { color: '#fff', fontWeight: '700' },
   codeText: { color: '#334155', fontWeight: '600' },
-  rateText: { color: '#0f172a', fontWeight: '600' },
   amount: { fontSize: 16, fontWeight: '700', color: '#1d4ed8' },
   totalWeight: { fontSize: 15, fontWeight: '700', color: '#0f172a' },
   warning: {

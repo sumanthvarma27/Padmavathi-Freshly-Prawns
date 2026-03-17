@@ -227,10 +227,10 @@ export default function CompanyRatesClient({
     if (res?.error) {
       toast.error(res.error)
     } else {
-      if (res?.skipped) {
+      if ('skipped' in res && res.skipped) {
         toast.info(res.message || 'Skipped overlapping company rate entry.')
       } else {
-        toast.success(res?.message || (editingRate ? 'Company rate updated.' : 'Company rate added.'))
+        toast.success(res.message || (editingRate ? 'Company rate updated.' : 'Company rate added.'))
       }
       setIsModalOpen(false)
       window.location.reload()

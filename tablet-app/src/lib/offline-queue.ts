@@ -8,6 +8,9 @@ type QueueItem =
         entryDate: string
         shedId: string
         companyId: string
+        processingTypeId: string
+        countRangeId: string
+        ratePerKgSnapshot: number
         rawWeightKg: number
       }
       createdAt: string

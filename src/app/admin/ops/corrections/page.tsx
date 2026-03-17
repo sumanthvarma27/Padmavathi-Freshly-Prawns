@@ -43,7 +43,12 @@ export default async function CorrectionsPage() {
             sheds, batches, workers, rates, processing types, and count ranges will stay untouched.
           </p>
         </div>
-        <form action={resetOperationalTestData}>
+        <form
+          action={async () => {
+            'use server'
+            await resetOperationalTestData()
+          }}
+        >
           <Button type="submit" variant="destructive">Clear All Transactions</Button>
         </form>
       </div>
